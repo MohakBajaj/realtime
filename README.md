@@ -25,19 +25,32 @@ bun install @upstash/realtime
 
 ## Quickstart
 
-### 1. Configure Upstash Redis
+### 1. Configure Redis
 
-Upstash realtime is powered by Redis. We'll assume you already have the `@upstash/redis` package installed:
+This library is powered by Redis using `ioredis`. First, install the ioredis package:
+
+```bash
+npm install ioredis
+# or
+bun install ioredis
+```
+
+Then configure your Redis connection:
 
 ```ts
 // lib/redis.ts
-import { Redis } from "@upstash/redis"
+import Redis from "ioredis";
 
 export const redis = new Redis({
-  // 👇 grab these from the Upstash Redis dashboard
-  url: "https://striking-osprey-20681.upstash.io",
-  token: "AVDJAAIjcDEyZ...",
-})
+  host: "your-redis-host.com",
+  port: 6379,
+  password: "your-redis-password",
+  // For Upstash Redis, use:
+  // host: "striking-osprey-20681.upstash.io",
+  // port: 6379,
+  // password: "your-upstash-token",
+  // tls: {},
+});
 ```
 
 ### 2. Define event schema
@@ -46,20 +59,19 @@ Define the structure of realtime events in your app.
 
 ```ts
 // lib/realtime.ts
-import { Realtime, InferRealtimeEvents } from "@upstash/realtime"
-import { redis } from "./redis"
-import z from "zod"
+import { Realtime, InferRealtimeEvents } from "@upstash/realtime";
+import { redis } from "./redis";
+import z from "zod";
 
 // 👇 later triggered with `realtime.notification.alert.emit()`
 const schema = {
   notification: z.object({
     alert: z.string(),
   }),
-}
+};
 
-
-export const realtime = new Realtime({ schema, redis })
-export type RealtimeEvents = InferRealtimeEvents<typeof realtime>
+export const realtime = new Realtime({ schema, redis });
+export type RealtimeEvents = InferRealtimeEvents<typeof realtime>;
 ```
 
 ### 3. Create realtime API endpoint
@@ -68,25 +80,25 @@ Create your realtime endpoint under `/api/realtime/route.ts`. It's important tha
 
 ```ts
 // api/realtime/route.ts
-import { handle } from "@upstash/realtime"
-import { realtime } from "@/lib"
+import { handle } from "@upstash/realtime";
+import { realtime } from "@/lib";
 
-export const GET = handle({ realtime })
+export const GET = handle({ realtime });
 ```
 
 ### 4. Emit events
 
 ```ts
-await realtime.notification.alert.emit("Hello world")
+await realtime.notification.alert.emit("Hello world");
 ```
 
 ### 5. Subscribe to events
 
 ```tsx
-"use client"
+"use client";
 
-import { useRealtime } from "@upstash/realtime/client"
-import type { RealtimeEvents } from "@/lib/realtime"
+import { useRealtime } from "@upstash/realtime/client";
+import type { RealtimeEvents } from "@/lib/realtime";
 
 export default function MyComponent() {
   useRealtime<RealtimeEvents>({
@@ -96,9 +108,9 @@ export default function MyComponent() {
         alert: (data) => console.log(data),
       },
     },
-  })
+  });
 
-  return <div>Listening for events...</div>
+  return <div>Listening for events...</div>;
 }
 ```
 
@@ -119,7 +131,7 @@ export const realtime = new Realtime({
 
   // 👇 Set to - Vercel free plan: 300; Vercel pro plan: 800
   maxDurationSecs: 300,
-})
+});
 ```
 
 Match this to your API route timeout:
@@ -128,9 +140,9 @@ Match this to your API route timeout:
 // api/realtime/route.ts
 
 // 👇 Set to - Vercel free plan: 300; Vercel pro plan: 800
-export const maxDuration = 300
+export const maxDuration = 300;
 
-export const GET = handle({ realtime })
+export const GET = handle({ realtime });
 ```
 
 **Vercel Note:** With fluid compute (default), you're only billed for active CPU time, not connection duration. This makes Upstash Realtime very cost-efficient.
@@ -140,12 +152,12 @@ export const GET = handle({ realtime })
 Scope events to channels or rooms:
 
 ```ts
-await realtime.channel("room-123").notification.alert.emit("Hello")
+await realtime.channel("room-123").notification.alert.emit("Hello");
 ```
 
 ```tsx
-import { useRealtime } from "@upstash/realtime/client"
-import type { RealtimeEvents } from "@/lib/realtime"
+import { useRealtime } from "@upstash/realtime/client";
+import type { RealtimeEvents } from "@/lib/realtime";
 
 useRealtime<RealtimeEvents>({
   channel: "room-123",
@@ -154,7 +166,7 @@ useRealtime<RealtimeEvents>({
       alert: (data) => console.log(data),
     },
   },
-})
+});
 ```
 
 ### History API
@@ -162,47 +174,51 @@ useRealtime<RealtimeEvents>({
 Access historical messages and chain with live subscriptions:
 
 ```ts
-const channel = realtime.channel("room-123")
+const channel = realtime.channel("room-123");
 
-const messages = await channel.history({ length: 50 })
-console.log(messages)
+const messages = await channel.history({ length: 50 });
+console.log(messages);
 
 await channel.history({ length: 50 }).on("notification.alert", (data) => {
-  console.log(data)
-})
+  console.log(data);
+});
 ```
 
 The history API returns a chainable promise that:
+
 - When awaited directly, returns an array of historical messages
 - When chained with `.on()`, first delivers all historical messages matching the event, then subscribes to live updates
 
 **Use Case 1: Just fetch history**
+
 ```ts
-const messages = await realtime.channel("chat").history({ length: 100 })
+const messages = await realtime.channel("chat").history({ length: 100 });
 ```
 
 **Use Case 2: History + live updates**
+
 ```ts
 await realtime
   .channel("chat")
   .history({ length: 100 })
   .on("message.sent", (data) => {
-    console.log("Message:", data)
-  })
+    console.log("Message:", data);
+  });
 ```
 
 Parameters:
+
 - `length`: Maximum number of messages to retrieve (most recent first)
 - `since`: Retrieve messages since a specific timestamp
 
 ### Connection Control
 
 ```tsx
-import { useState } from "react"
-import { useRealtime } from "@upstash/realtime/client"
-import type { RealtimeEvents } from "@/lib/realtime"
+import { useState } from "react";
+import { useRealtime } from "@upstash/realtime/client";
+import type { RealtimeEvents } from "@/lib/realtime";
 
-const [enabled, setEnabled] = useState(true)
+const [enabled, setEnabled] = useState(true);
 
 const { status } = useRealtime<RealtimeEvents>({
   enabled,
@@ -211,7 +227,7 @@ const { status } = useRealtime<RealtimeEvents>({
       alert: (data) => console.log(data),
     },
   },
-})
+});
 ```
 
 ---
@@ -223,24 +239,24 @@ const { status } = useRealtime<RealtimeEvents>({
 Protect your realtime endpoints with custom authentication logic.
 
 ```ts
-import { realtime } from "@/lib"
-import { handle } from "@upstash/realtime"
-import { currentUser } from "@/auth"
+import { realtime } from "@/lib";
+import { handle } from "@upstash/realtime";
+import { currentUser } from "@/auth";
 
 export const GET = handle({
   realtime,
   middleware: async ({ request, channel }) => {
-    const user = await currentUser(request)
+    const user = await currentUser(request);
 
     if (channel === user.id) {
-      return
+      return;
     }
 
     if (channel !== user.id) {
-      return new Response("Unauthorized", { status: 401 })
+      return new Response("Unauthorized", { status: 401 });
     }
   },
-})
+});
 ```
 
 The middleware function receives:
